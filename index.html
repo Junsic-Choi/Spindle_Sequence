@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스핀들 작업 순서 관리</title>
+    <style>
+        :root {
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --bg-color: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text-main: #0F172A;
+            --text-muted: #475569;
+            --border-color: #E2E8F0;
+            --completed-bg: #FEF08A;
+            /* 노란색 배경 */
+            --danger: #EF4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .header-title h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+
+        .header-title p {
+            font-size: 15px;
+            color: var(--text-muted);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .machine-select {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: white;
+            font-size: 16px;
+            color: var(--text-main);
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s;
+        }
+
+        .machine-select:hover {
+            border-color: var(--primary);
+        }
+
+        .machine-section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .machine-header {
+            background-color: #F1F5F9;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .machine-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .worker-name {
+            font-size: 16px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+
+        th {
+            background-color: #F8FAFC;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 14px;
+            padding: 12px 16px;
+            border-bottom: 2px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            font-size: 14px;
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+
+        /* 첫번째, 마지막 컬럼 선 제거 */
+        th:last-child,
+        td:last-child {
+            border-right: none;
+        }
+
+        tbody tr {
+            transition: background-color 0.2s;
+            background-color: #FFFFFF;
+        }
+
+        /* 드래그 앤 드롭 스타일 */
+        tbody tr.draggable {
+            cursor: grab;
+        }
+
+        tbody tr.draggable:active {
+            cursor: grabbing;
+        }
+
+        tbody tr.dragging {
+            opacity: 0.4;
+            background-color: #EEF2FF !important;
+        }
+
+        .drag-handle {
+            color: #9CA3AF;
+            font-size: 18px;
+            cursor: grab;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        tbody tr:hover:not(.completed):not(.dragging) {
+            background-color: #F8FAFC;
+        }
+
+        /* 완료된 항목 노란색 스타일 */
+        tbody tr.completed {
+            background-color: var(--completed-bg);
+        }
+
+        /* 컬럼 너비 비율 고정 */
+        .col-seq {
+            width: 60px;
+        }
+
+        .col-item-no {
+            width: 13%;
+        }
+
+        .col-item-name {
+            width: 30%;
+            /* 품명 살짝 줄임 */
+        }
+
+        .col-qty {
+            width: 60px;
+        }
+
+        .col-note {
+            width: 27%;
+        }
+
+        .col-actions {
+            width: 190px;
+        }
+
+        .btn {
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-complete {
+            background-color: #10B981;
+            color: white;
+            margin-right: 6px;
+        }
+
+        .btn-complete:hover {
+            background-color: #059669;
+        }
+
+        .btn-undo {
+            background-color: #6B7280;
+            color: white;
+            margin-right: 6px;
+        }
+
+        .btn-undo:hover {
+            background-color: #4B5563;
+        }
+
+        .btn-delete {
+            background-color: white;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .btn-delete:hover {
+            background-color: #FEF2F2;
+        }
+
+        /* 텍스트 정렬 */
+        .text-left {
+            text-align: left;
+        }
+
+        /* 비고 인풋 스타일 */
+        .note-input {
+            width: 100%;
+            border: 1px solid transparent;
+            background: transparent;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .note-input:hover,
+        .note-input:focus {
+            border-color: var(--border-color);
+            background: white;
+            outline: none;
+        }
+
+        /* 완료된 열 인풋 디자인 */
+        .completed .note-input {
+            background: transparent;
+        }
+
+        .add-form-container {
+            padding: 16px 24px;
+            background-color: #F8FAFC;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .add-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .add-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn-add {
+            background-color: var(--primary);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .btn-add:hover {
+            background-color: var(--primary-hover);
+        }
+
+        /* 모달 스타일 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-color);
+            text-align: right;
+            background: #F8FAFC;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+        }
+
+        .master-item {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .master-item input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .master-item input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn-master {
+            background-color: white;
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-right: 12px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-master:hover {
+            background-color: #F1F5F9;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-title">
+                <div>
+                    <h1>스핀들 작업 순서 관리</h1>
+                    <p>장비별 생산 순서 확인 및 완료/삭제 처리</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <button class="btn-master" onclick="openMasterModal()">⚙️ 장비 마스터</button>
+                <select id="machineFilter" class="machine-select" onchange="renderApp()">
+                    <!-- JS에서 옵션 채움 -->
+                </select>
+            </div>
+        </div>
+
+        <!-- 컨텐츠 영역 -->
+        <div id="app"></div>
+
+    </div>
+
+    <!-- 장비 마스터 모달 -->
+    <div class="modal-overlay" id="masterModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ 장비 마스터 관리</h2>
+                <button class="btn-close" onclick="closeMasterModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; font-size: 14px; color: var(--text-muted);">
+                    장비명과 작업자를 수정, 삭제하거나 새로운 장비를 하단에 추가할 수 있습니다.
+                </p>
+                <div id="masterList">
+                    <!-- JS로 렌더링 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-undo" style="margin-right:0;" onclick="closeMasterModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 제공된 이미지 데이터를 기반으로 초기 데이터 구성
+        const initialData = [
+            {
+                machine: "S41I",
+                worker: "김광일 반장",
+                items: [
+                    { id: "S41I_1", itemNo: "140203-00908D", itemName: "HOUSING,BEARING;PRELOAD", qty: 1, note: "2월말까지", completed: true },
+                    { id: "S41I_2", itemNo: "140203-01092C", itemName: "HOUSING,BEARING;FRONT", qty: 10, note: "2월말까지", completed: true },
+                    { id: "S41I_3", itemNo: "140203-00909A", itemName: "HOUSING,BEARING;FRONT", qty: 5, note: "2월말까지", completed: true },
+                    { id: "S41I_4", itemNo: "140203-01082C", itemName: "HOUSING,BEARING;FRONT", qty: 2, note: "2월말까지", completed: true },
+                    { id: "S41I_5", itemNo: "140203-01092C", itemName: "HOUSING,BEARING;FRONT", qty: 5, note: "2월말까지", completed: true },
+                    { id: "S41I_6", itemNo: "110931-00556B", itemName: "HOUSING;FRONT BRG", qty: 1, note: "2월말까지", completed: true },
+                    { id: "S41I_7", itemNo: "110931-00557B", itemName: "HOUSING;REAR BRG", qty: 1, note: "2월말까지", completed: true },
+                    { id: "S41I_8", itemNo: "160601-00465C", itemName: "BODY;REAR HOUSING", qty: 1, note: "2월말까지", completed: true },
+                    { id: "S41I_9", itemNo: "140203-01093A", itemName: "HOUSING,BEARING;FRONT", qty: 8, note: "3/초", completed: false },
+                    { id: "S41I_10", itemNo: "140203-01094A", itemName: "HOUSING,BEARING;REAR", qty: 8, note: "3/초", completed: false },
+                    { id: "S41I_11", itemNo: "140203-01240", itemName: "HOUSING,BEARING;FRONT", qty: 4, note: "", completed: false },
+                    { id: "S41I_12", itemNo: "110931-03256", itemName: "HOUSING;REAR", qty: 6, note: "", completed: false },
+                    { id: "S41I_13", itemNo: "140203-01246A", itemName: "HOUSING,BEARING;REAR", qty: 6, note: "", completed: false },
+                    { id: "S41I_14", itemNo: "140203-01241A", itemName: "HOUSING,BEARING;PRELOAD", qty: 6, note: "", completed: false }
+                ]
+            },
+            {
+                machine: "S41I2",
+                worker: "김준형",
+                items: [
+                    { id: "S41I2_1", itemNo: "C51016082C", itemName: "HOUSING,BEARING;REAR", qty: 15, note: "2월 말까지", completed: true },
+                    { id: "S41I2_2", itemNo: "140203-01098A", itemName: "HOUSING,BEARING;REAR", qty: 10, note: "2월 말까지", completed: true },
+                    { id: "S41I2_3", itemNo: "140203-00981", itemName: "HOUSING,BEARING;FRONT", qty: 5, note: "2월 말까지", completed: true },
+                    { id: "S41I2_4", itemNo: "140203-00618B", itemName: "HOUSING,BEARING;REAR", qty: 10, note: "2월 말까지", completed: true },
+                    { id: "S41I2_5", itemNo: "140203-00981", itemName: "HOUSING,BEARING;FRONT", qty: 5, note: "2월 말까지", completed: true },
+                    { id: "S41I2_6", itemNo: "140203-01098A", itemName: "HOUSING,BEARING;REAR", qty: 5, note: "2월 말까지", completed: true },
+                    { id: "S41I2_7", itemNo: "140203-01097", itemName: "HOUSING,BEARING;PRELOAD", qty: 5, note: "2월 말까지", completed: true },
+                    { id: "S41I2_8", itemNo: "110931-02390A", itemName: "HOUSING;FRONT BRG.", qty: 3, note: "", completed: false },
+                    { id: "S41I2_9", itemNo: "110931-02346A", itemName: "HOUSING;FRONT BRG.", qty: 3, note: "", completed: false },
+                    { id: "S41I2_10", itemNo: "110931-02348B", itemName: "HOUSING;REAR BRG.", qty: 3, note: "", completed: false },
+                    { id: "S41I2_11", itemNo: "430215-02091B", itemName: "FLANGE;REAR BRG", qty: 3, note: "", completed: false }
+                ]
+            },
+            {
+                machine: "S151",
+                worker: "배영호",
+                items: []
+            },
+            {
+                machine: "S41O",
+                worker: "김호영",
+                items: [
+                    { id: "S41O_1", itemNo: "130713-06099", itemName: "SPINDLE,MAIN;HSK", qty: 4, note: "불출요청 완료", completed: false },
+                    { id: "S41O_2", itemNo: "130713-05882", itemName: "SPINDLE,MAIN;BT/CT/DIN", qty: 1, note: "불출요청 완료", completed: false },
+                    { id: "S41O_3", itemNo: "130713-06582", itemName: "SPINDLE,MAIN", qty: 1, note: "불출요청 완료", completed: false },
+                    { id: "S41O_4", itemNo: "130713-03170", itemName: "SPINDLE,MAIN", qty: 5, note: "불출요청 완료", completed: false },
+                    { id: "S41O_5", itemNo: "130713-05971", itemName: "SPINDLE,MAIN", qty: 5, note: "불출요청 완료", completed: false },
+                    { id: "S41O_6", itemNo: "130713-02733A", itemName: "SPINDLE,MAIN", qty: 5, note: "", completed: false },
+                    { id: "S41O_7", itemNo: "130713-02734A", itemName: "SPINDLE,MAIN", qty: 1, note: "", completed: false },
+                    { id: "S41O_8", itemNo: "130713-01556B", itemName: "SPINDLE,MAIN", qty: 2, note: "", completed: false },
+                    { id: "S41O_9", itemNo: "130713-05055B", itemName: "SPINDLE,MAIN", qty: 11, note: "", completed: false },
+                    { id: "S41O_10", itemNo: "130713-03169", itemName: "SPINDLE,MAIN", qty: 4, note: "", completed: false }
+                ]
+            },
+            {
+                machine: "S41",
+                worker: "박종훈",
+                items: [
+                    { id: "S41_1", itemNo: "130713-03996C", itemName: "SPINDLE,MAIN", qty: 3, note: "", completed: false },
+                    { id: "S41_2", itemNo: "130713-00020B", itemName: "SPINDLE,MAIN", qty: 10, note: "", completed: false },
+                    { id: "S41_3", itemNo: "130713-05701", itemName: "SPINDLE,MAIN;8K HSK", qty: 10, note: "소재 3/3 예정", completed: false },
+                    { id: "S41_4", itemNo: "130713-00878G", itemName: "SPINDLE,MAIN", qty: 10, note: "", completed: false },
+                    { id: "S41_5", itemNo: "130713-03996C", itemName: "SPINDLE,MAIN", qty: 3, note: "", completed: false },
+                    { id: "S41_6", itemNo: "C81018611C", itemName: "SPINDLE,MAIN;(BIG PLUS)", qty: 1, note: "도금 수정품", completed: false },
+                    { id: "S41_7", itemNo: "130713-01401E", itemName: "SPINDLE,MAIN;6K_BT_CT_DIN", qty: 6, note: "", completed: false },
+                    { id: "S41_8", itemNo: "130713-04894A", itemName: "SPINDLE,MAIN", qty: 5, note: "", completed: false }
+                ]
+            },
+            {
+                machine: "KEL3",
+                worker: "배강석",
+                items: []
+            },
+            {
+                machine: "PF61",
+                worker: "이원수",
+                items: []
+            },
+            {
+                machine: "PF62",
+                worker: "이영재",
+                items: []
+            },
+            {
+                machine: "F152",
+                worker: "박정호",
+                items: []
+            },
+            {
+                machine: "GRI10",
+                worker: "안효국",
+                items: []
+            }
+        ];
+
+        // LocalStorage에서 데이터를 불러오거나 없다면 초기 데이터 사용
+        // 브라우저 캐시에 옛날 데이터가 남아있으면 새 장비가 안 보일 수 있으므로
+        // 기존 캐시를 날리고 새 데이터를 병합하는 로직 추가
+        let storedData = JSON.parse(localStorage.getItem('spindleSequenceData'));
+
+        // 저장된 데이터가 없거나, 저장된 데이터의 장비 종류 개수가 초기 데이터 장비 종류 개수보다 적으면 강제 업데이트
+        if (!storedData || storedData.length < initialData.length) {
+            appData = initialData;
+            saveData();
+        } else {
+            appData = storedData;
+
+            // 기존 데이터에 혹시 initialData에 새로 추가된 장비가 없는지 검사하여 채워넣기 (옵셔널)
+            initialData.forEach(initItem => {
+                if (!appData.find(d => d.machine === initItem.machine)) {
+                    appData.push({
+                        machine: initItem.machine,
+                        worker: initItem.worker,
+                        items: []
+                    });
+                }
+            });
+            saveData();
+        }
+
+        function initFilter() {
+            const filterSelect = document.getElementById('machineFilter');
+            filterSelect.innerHTML = '<option value="ALL">전체 장비 보기</option>';
+            appData.forEach(section => {
+                const option = document.createElement('option');
+                option.value = section.machine;
+                option.textContent = `${section.machine} (${section.worker})`;
+                filterSelect.appendChild(option);
+            });
+        }
+
+        function saveData() {
+            localStorage.setItem('spindleSequenceData', JSON.stringify(appData));
+        }
+
+        function renderApp() {
+            const appContainer = document.getElementById('app');
+            const selectedMachine = document.getElementById('machineFilter').value;
+            appContainer.innerHTML = ''; // 초기화
+
+            const filteredData = selectedMachine === 'ALL'
+                ? appData
+                : appData.filter(section => section.machine === selectedMachine);
+
+            filteredData.forEach((section, sIndex) => {
+                // 원본 appData 배열에서의 실제 인덱스를 찾음 (업데이트 함수들을 위해)
+                const realIndex = appData.findIndex(s => s.machine === section.machine);
+
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = 'machine-section';
+
+                // 헤더 영역 (비어있는 섹션이라도 헤더는 보여줌)
+                sectionDiv.innerHTML = `
+                <div class="machine-header">
+                    <span class="machine-title">${section.machine} :</span>
+                    <span class="worker-name">${section.worker}</span>
+                </div>
+            `;
+
+                // 테이블 영역
+                const tableWrapper = document.createElement('div');
+                tableWrapper.className = 'table-wrapper';
+
+                const table = document.createElement('table');
+                // 테이블 헤더
+                table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th class="col-seq">순서</th>
+                        <th class="col-item-no">품번</th>
+                        <th class="col-item-name">품명</th>
+                        <th class="col-qty">수량</th>
+                        <th class="col-note">비고</th>
+                        <th class="col-actions">관리</th>
+                    </tr>
+                </thead>
+            `;
+
+                const tbody = document.createElement('tbody');
+
+                if (section.items.length === 0) {
+                    // 데이터가 없는 경우
+                    tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="color:#9CA3AF; padding: 24px;">등록된 작업이 없습니다.</td>
+                    </tr>
+                `;
+                } else {
+                    // 데이터 렌더링
+                    section.items.forEach((item, itemIndex) => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'draggable';
+                        tr.setAttribute('draggable', true);
+                        tr.dataset.id = item.id;
+                        tr.dataset.index = itemIndex; // 드래그 시 순서 파악용
+
+                        // 완료되면 노란색 줄 추가
+                        if (item.completed) {
+                            tr.classList.add('completed');
+                        }
+
+                        tr.innerHTML = `
+                        <td><span class="drag-handle">≡</span>${itemIndex + 1}</td>
+                        <td class="text-left">${item.itemNo}</td>
+                        <td class="text-left">${item.itemName}</td>
+                        <td>
+                            <input type="number" class="note-input" style="text-align: center; width: 60px;" value="${item.qty}"
+                                   onchange="updateQty(${realIndex}, '${item.id}', this.value)"
+                                   placeholder="수량">
+                        </td>
+                        <td>
+                            <input type="text" class="note-input" value="${item.note}"
+                                   onchange="updateNote(${realIndex}, '${item.id}', this.value)"
+                                   placeholder="비고 입력">
+                        </td>
+                        <td>
+                            ${item.completed
+                                ? `<button class="btn btn-undo" onclick="toggleComplete(${realIndex}, '${item.id}')">완료 취소</button>`
+                                : `<button class="btn btn-complete" onclick="toggleComplete(${realIndex}, '${item.id}')">완료</button>`
+                            }
+                            <button class="btn btn-delete" onclick="deleteItem(${realIndex}, '${item.id}')">삭제</button>
+                        </td>
+                    `;
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                table.appendChild(tbody);
+                tableWrapper.appendChild(table);
+                sectionDiv.appendChild(tableWrapper);
+
+                // 작업 추가 폼
+                const addFormContainer = document.createElement('div');
+                addFormContainer.className = 'add-form-container';
+                addFormContainer.innerHTML = `
+                <input type="text" id="add-no-${realIndex}" class="add-input" placeholder="품번" style="flex: 1.5;">
+                <input type="text" id="add-name-${realIndex}" class="add-input" placeholder="품명" style="flex: 2;">
+                <input type="number" id="add-qty-${realIndex}" class="add-input" placeholder="수량" style="flex: 0.5;">
+                <input type="text" id="add-note-${realIndex}" class="add-input" placeholder="비고" style="flex: 1;">
+                <button class="btn-add" onclick="addNewItem(${realIndex})">+ 추가</button>
+            `;
+                sectionDiv.appendChild(addFormContainer);
+
+                appContainer.appendChild(sectionDiv);
+            });
+
+            addDragAndDropHandlers();
+        }
+
+        // 새 작업 추가 기능
+        window.addNewItem = function (sIndex) {
+            const noInput = document.getElementById(`add-no-${sIndex}`);
+            const nameInput = document.getElementById(`add-name-${sIndex}`);
+            const qtyInput = document.getElementById(`add-qty-${sIndex}`);
+            const noteInput = document.getElementById(`add-note-${sIndex}`);
+
+            if (!noInput.value.trim() && !nameInput.value.trim()) {
+                alert("품번이나 품명 중 하나는 입력해주세요.");
+                return;
+            }
+
+            const newItem = {
+                id: appData[sIndex].machine + '_' + Date.now(),
+                itemNo: noInput.value.trim(),
+                itemName: nameInput.value.trim(),
+                qty: qtyInput.value ? parseInt(qtyInput.value, 10) : 1,
+                note: noteInput.value.trim(),
+                completed: false
+            };
+
+            appData[sIndex].items.push(newItem);
+            saveData();
+            renderApp();
+        };
+
+        // 기능 액션 함수들 (전역)
+
+        // 완료 토글 기능 (노란색 켜짐/꺼짐)
+        window.toggleComplete = function (sIndex, itemId) {
+            const item = appData[sIndex].items.find(i => i.id === itemId);
+            if (item) {
+                item.completed = !item.completed;
+                saveData();
+                renderApp();
+            }
+        };
+
+        // 항목 삭제 기능 (삭제 후 순서는 자동으로 다시 부여됨 - index 기반이므로)
+        window.deleteItem = function (sIndex, itemId) {
+            if (confirm('이 작업을 목록에서 완전히 삭제하시겠습니까? (삭제 후 다음 순서가 자동으로 당겨집니다)')) {
+                appData[sIndex].items = appData[sIndex].items.filter(i => i.id !== itemId);
+                saveData();
+                renderApp();
+            }
+        };
+
+        // 비고 실시간 업데이트 (Input onchange)
+        window.updateNote = function (sIndex, itemId, newNote) {
+            const item = appData[sIndex].items.find(i => i.id === itemId);
+            if (item) {
+                item.note = newNote;
+                saveData();
+            }
+        };
+
+        // 수량 실시간 업데이트 (Input onchange)
+        window.updateQty = function (sIndex, itemId, newQty) {
+            const item = appData[sIndex].items.find(i => i.id === itemId);
+            if (item) {
+                item.qty = parseInt(newQty, 10) || 0; // 숫자로 변환
+                saveData();
+            }
+        };
+
+        // 드래그 앤 드롭 로직
+        let dragSourceIndex = null;
+        let dragSectionIndex = null;
+
+        function addDragAndDropHandlers() {
+            const rows = document.querySelectorAll('.draggable');
+
+            rows.forEach(row => {
+                row.addEventListener('dragstart', function (e) {
+                    dragSourceIndex = parseInt(this.dataset.index, 10);
+                    // 가장 가까운 .machine-section div를 찾아 장비 인덱스를 추출
+                    const parentSection = this.closest('.machine-section');
+                    const machineTitle = parentSection.querySelector('.machine-title').textContent.split(':')[0].trim();
+                    dragSectionIndex = appData.findIndex(s => s.machine === machineTitle);
+
+                    setTimeout(() => this.classList.add('dragging'), 0);
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                row.addEventListener('dragover', function (e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+
+                    const currentSectionTitle = this.closest('.machine-section').querySelector('.machine-title').textContent.split(':')[0].trim();
+                    const currentSectionIndex = appData.findIndex(s => s.machine === currentSectionTitle);
+
+                    // 다른 장비 간에는 이동 금지
+                    if (currentSectionIndex !== dragSectionIndex) return;
+
+                    const bounding = this.getBoundingClientRect();
+                    const offset = e.clientY - bounding.top;
+
+                    // 마우스 위치에 따라 위로 넣을지 아래로 넣을지 시각적 표시
+                    if (offset > bounding.height / 2) {
+                        this.style.borderBottom = '2px solid var(--primary)';
+                        this.style.borderTop = '';
+                    } else {
+                        this.style.borderTop = '2px solid var(--primary)';
+                        this.style.borderBottom = '';
+                    }
+                });
+
+                row.addEventListener('dragleave', function () {
+                    this.style.borderBottom = '';
+                    this.style.borderTop = '';
+                });
+
+                row.addEventListener('dragend', function () {
+                    this.classList.remove('dragging');
+                    rows.forEach(r => {
+                        r.style.borderBottom = '';
+                        r.style.borderTop = '';
+                    });
+                });
+
+                row.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    this.style.borderBottom = '';
+                    this.style.borderTop = '';
+
+                    const currentSectionTitle = this.closest('.machine-section').querySelector('.machine-title').textContent.split(':')[0].trim();
+                    const currentSectionIndex = appData.findIndex(s => s.machine === currentSectionTitle);
+
+                    // 다른 장비 간 이동 방지
+                    if (currentSectionIndex !== dragSectionIndex || dragSourceIndex === null) return;
+
+                    const dropTargetIndex = parseInt(this.dataset.index, 10);
+                    const bounding = this.getBoundingClientRect();
+                    const offset = e.clientY - bounding.top;
+
+                    // 삽입될 최종 인덱스 계산
+                    let insertIndex = dropTargetIndex;
+                    if (offset > bounding.height / 2) {
+                        insertIndex++;
+                    }
+                    if (dragSourceIndex < insertIndex) {
+                        insertIndex--;
+                    }
+
+                    if (dragSourceIndex !== insertIndex) {
+                        // 데이터 배열 위치 변경
+                        const itemsArray = appData[dragSectionIndex].items;
+                        const [movedItem] = itemsArray.splice(dragSourceIndex, 1);
+                        itemsArray.splice(insertIndex, 0, movedItem);
+
+                        saveData();
+                        renderApp();
+                    }
+                });
+            });
+        }
+
+        // --- 장비 마스터 모달 로직 ---
+        function openMasterModal() {
+            document.getElementById('masterModal').classList.add('active');
+            renderMasterList();
+        }
+
+        function closeMasterModal() {
+            document.getElementById('masterModal').classList.remove('active');
+        }
+
+        function renderMasterList() {
+            const masterList = document.getElementById('masterList');
+            masterList.innerHTML = '';
+
+            appData.forEach((section, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'master-item';
+                itemDiv.innerHTML = `
+                    <input type="text" value="${section.machine}" onchange="updateMasterMachine(${index}, this.value)" placeholder="장비명 (예: S41I)">
+                    <input type="text" value="${section.worker}" onchange="updateMasterWorker(${index}, this.value)" placeholder="작업자명 (예: 홍길동)">
+                    <button class="btn btn-delete" onclick="deleteMasterItem(${index})">삭제</button>
+                `;
+                masterList.appendChild(itemDiv);
+            });
+
+            // 새 장비 추가 행
+            const addDiv = document.createElement('div');
+            addDiv.className = 'master-item';
+            addDiv.style.marginTop = '16px';
+            addDiv.style.borderTop = '1px dashed var(--border-color)';
+            addDiv.style.paddingTop = '16px';
+            addDiv.innerHTML = `
+                <input type="text" id="newMasterMachine" placeholder="새 장비명">
+                <input type="text" id="newMasterWorker" placeholder="새 작업자명">
+                <button class="btn btn-complete" style="margin-right:0; width: 62px;" onclick="addMasterItem()">추가</button>
+            `;
+            masterList.appendChild(addDiv);
+        }
+
+        window.updateMasterMachine = function (index, newVal) {
+            if (newVal.trim() === '') {
+                alert('장비명을 입력해주세요.');
+                renderMasterList();
+                return;
+            }
+            appData[index].machine = newVal;
+            afterMasterChange();
+        };
+
+        window.updateMasterWorker = function (index, newVal) {
+            appData[index].worker = newVal;
+            afterMasterChange();
+        };
+
+        window.deleteMasterItem = function (index) {
+            if (confirm(`정말 "${appData[index].machine}" 장비를 삭제하시겠습니까? (하위 작업 내역도 모두 삭제됩니다)`)) {
+                appData.splice(index, 1);
+                afterMasterChange();
+            }
+        };
+
+        window.addMasterItem = function () {
+            const mInput = document.getElementById('newMasterMachine');
+            const wInput = document.getElementById('newMasterWorker');
+            if (mInput.value.trim() === '') {
+                alert('새 장비명을 입력해주세요!');
+                return;
+            }
+
+            appData.push({
+                machine: mInput.value.trim(),
+                worker: wInput.value.trim(),
+                items: []
+            });
+            afterMasterChange();
+        };
+
+        function afterMasterChange() {
+            saveData();
+            initFilter(); // 드롭다운 항목 갱신
+            renderApp();  // 메인 테이블 갱신
+            renderMasterList(); // 모달 폼 갱신
+        }
+
+        // 초기 실행
+        document.addEventListener('DOMContentLoaded', () => {
+            initFilter();
+            renderApp();
+        });
+
+    </script>
+
+</body>
+
+</html>
