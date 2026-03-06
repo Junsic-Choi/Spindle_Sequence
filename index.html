@@ -426,7 +426,112 @@
             display: flex;
             align-items: center;
         }
+
+        /* 엑셀/인쇄 버튼 스타일 */
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-action {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            background-color: white;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        .btn-action:hover {
+            background-color: #F8FAFC;
+        }
+
+        .btn-action.excel {
+            color: #16A34A;
+            border-color: #16A34A;
+            background-color: #F0FDF4;
+        }
+
+        .btn-action.excel:hover {
+            background-color: #DCFCE7;
+        }
+
+        .btn-action.print {
+            color: #475569;
+        }
+
+        /* 인쇄 최적화 스타일 */
+        @media print {
+            body {
+                padding: 0;
+                background-color: white;
+            }
+
+            .header,
+            .btn,
+            .btn-master,
+            .btn-action,
+            .add-form-container,
+            .modal-overlay,
+            .drag-handle {
+                display: none !important;
+            }
+
+            .machine-section {
+                box-shadow: none !important;
+                border: 1px solid #000;
+                margin-bottom: 20px;
+                page-break-inside: avoid;
+            }
+
+            .machine-header {
+                background-color: #f0f0f0 !important;
+                border-bottom: 1px solid #000;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            th {
+                background-color: #f0f0f0 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            th,
+            td {
+                border-color: #000 !important;
+                color: #000 !important;
+            }
+
+            /* 인풋 요소를 텍스트처럼 보이게 처리 */
+            .note-input {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                color: #000 !important;
+            }
+
+            .completed {
+                background-color: transparent !important;
+            }
+
+            #app {
+                margin-top: 20px;
+            }
+        }
     </style>
+    <!-- ExcelJS & FileSaver for styled Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 
 <body>
@@ -439,11 +544,33 @@
                     <p>장비별 생산 순서 확인 및 완료/삭제 처리</p>
                 </div>
             </div>
-            <div class="header-controls">
-                <button class="btn-master" onclick="openMasterModal()">⚙️ 장비 마스터</button>
-                <select id="machineFilter" class="machine-select" onchange="renderApp()">
-                    <!-- JS에서 옵션 채움 -->
-                </select>
+            <div class="header-controls-wrapper">
+                <div class="header-controls">
+                    <button class="btn-master" onclick="openMasterModal()">⚙️ 장비 마스터</button>
+                    <select id="machineFilter" class="machine-select" onchange="renderApp()">
+                        <!-- JS에서 옵션 채움 -->
+                    </select>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-action excel" onclick="exportToExcel()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
+                        </svg>
+                        엑셀 추출
+                    </button>
+                    <button class="btn-action print" onclick="window.print()">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z">
+                            </path>
+                        </svg>
+                        인쇄 (Ctrl+P)
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -969,6 +1096,115 @@
             renderApp();  // 메인 테이블 갱신
             renderMasterList(); // 모달 폼 갱신
         }
+
+        // 엑셀 추출 기능 (스타일 포함 - ExcelJS 사용)
+        window.exportToExcel = async function () {
+            try {
+                const selectedMachine = document.getElementById('machineFilter').value;
+                const filteredData = selectedMachine === 'ALL'
+                    ? appData
+                    : appData.filter(section => section.machine === selectedMachine);
+
+                if (filteredData.length === 0 || filteredData.every(s => s.items.length === 0)) {
+                    alert("추출할 데이터가 없습니다.");
+                    return;
+                }
+
+                const workbook = new ExcelJS.Workbook();
+                const worksheet = workbook.addWorksheet('작업목록');
+
+                // 컬럼 정의 (너비 및 키)
+                worksheet.columns = [
+                    { header: '장비명', key: 'machine', width: 15 },
+                    { header: '작업자', key: 'worker', width: 12 },
+                    { header: '순서', key: 'seq', width: 8 },
+                    { header: '품번', key: 'itemNo', width: 22 },
+                    { header: '품명', key: 'itemName', width: 40 },
+                    { header: '수량', key: 'qty', width: 8 },
+                    { header: '비고', key: 'note', width: 30 },
+                    { header: '상태', key: 'status', width: 10 }
+                ];
+
+                // 헤더 스타일 적용
+                const headerRow = worksheet.getRow(1);
+                headerRow.height = 25;
+                headerRow.eachCell((cell) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FF4F46E5' } // 인디고 배경
+                    };
+                    cell.font = {
+                        color: { argb: 'FFFFFFFF' }, // 휜 글씨
+                        bold: true,
+                        size: 11
+                    };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    cell.border = {
+                        top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+                    };
+                });
+
+                // 데이터 행 추가
+                let currentRowIdx = 2;
+                filteredData.forEach(section => {
+                    section.items.forEach((item, index) => {
+                        const row = worksheet.addRow({
+                            machine: section.machine,
+                            worker: section.worker,
+                            seq: index + 1,
+                            itemNo: item.itemNo,
+                            itemName: item.itemName,
+                            qty: item.qty,
+                            note: item.note,
+                            status: item.completed ? '완료' : '진행중'
+                        });
+
+                        row.height = 20;
+
+                        // 각 셀의 개별 스타일 지정 
+                        row.eachCell((cell, colNumber) => {
+                            cell.border = {
+                                top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+                            };
+
+                            // 가로 정렬 지정 (4, 5, 7열: 품번, 품명, 비고는 좌측)
+                            const isLeftAlign = colNumber === 4 || colNumber === 5 || colNumber === 7;
+                            cell.alignment = {
+                                vertical: 'middle',
+                                horizontal: isLeftAlign ? 'left' : 'center'
+                            };
+
+                            // 완료 상태일 때 노란색 배경
+                            if (item.completed) {
+                                cell.fill = {
+                                    type: 'pattern',
+                                    pattern: 'solid',
+                                    fgColor: { argb: 'FFFEF08A' } // 노란색
+                                };
+                            }
+                        });
+                        currentRowIdx++;
+                    });
+                });
+
+                // 파일 생성 및 다운로드 (FileSaver.js 활용)
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+                const now = new Date();
+                const dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+                const fileName = selectedMachine === 'ALL'
+                    ? `전체_작업목록_${dateStr}.xlsx`
+                    : `${selectedMachine}_작업목록_${dateStr}.xlsx`;
+
+                saveAs(blob, fileName);
+
+            } catch (e) {
+                console.error("Excel 저장 실패:", e);
+                alert("엑셀 파일 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+            }
+        };
 
         // 초기 실행
         document.addEventListener('DOMContentLoaded', () => {
