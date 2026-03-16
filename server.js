@@ -6,7 +6,8 @@ const path = require('path');
 const PORT = 8282;
 
 const server = http.createServer((req, res) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    const timestamp = new Date().toLocaleString();
+    console.log(`[${timestamp}] ${req.method} ${req.url}`);
 
     // 기본 경로는 index.html 제공
     let filePath = req.url === '/' ? '/index.html' : req.url;
@@ -36,9 +37,11 @@ const server = http.createServer((req, res) => {
     fs.readFile(filePath, (error, content) => {
         if (error) {
             if (error.code == 'ENOENT') {
+                console.error(`[${timestamp}] 404 Not Found: ${filePath}`);
                 res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
                 res.end('<h1>404 Not Found</h1><p>해당 파일을 찾을 수 없습니다.</p>', 'utf-8');
             } else {
+                console.error(`[${timestamp}] Server Error: ${error.code} for ${filePath}`);
                 res.writeHead(500);
                 res.end(`Server Error: ${error.code}`);
             }
@@ -49,9 +52,22 @@ const server = http.createServer((req, res) => {
     });
 });
 
+// 서버 오류 핸들링 (포트 충돌 등)
+server.on('error', (e) => {
+    const timestamp = new Date().toLocaleString();
+    if (e.code === 'EADDRINUSE') {
+        console.error(`[${timestamp}] 오류: ${PORT} 포트가 이미 사용 중입니다. 다른 프로세스를 종료하거나 포트를 변경하세요.`);
+    } else {
+        console.error(`[${timestamp}] 서버 오류 발생: ${e.message}`);
+    }
+    process.exit(1);
+});
+
 // 호스트 '0.0.0.0'을 지정하여 사내망(외부)에서도 IP 주소로 접속할 수 있도록 허용
 server.listen(PORT, '0.0.0.0', () => {
+    const timestamp = new Date().toLocaleString();
     console.log(`=======================================================`);
+    console.log(`실행 시간: ${timestamp}`);
     console.log(`스핀들직 작업 순서 관리 서버가 실행되었습니다.`);
     console.log(`사내 네트워크 접속용 주소: http://10.33.56.86:${PORT}`);
     console.log(`로컬 PC 접속용 주소: http://localhost:${PORT}`);
